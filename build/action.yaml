@@ -1,0 +1,160 @@
+name: Build & push docker images
+description: Build and push docker images with native or cross-platform support
+inputs:
+  docker-config-file:
+    required: false
+    description: Path to the docker config file (defaults to .docker-config.json) Must contain imageName, may contain dockerfile.
+    default: .docker-config.json
+  dockerhub-user:
+    required: true
+    description: DockerHub username
+  dockerhub-password:
+    required: true
+    description: DockerHub password
+  image-version:
+    required: true
+    description: Docker image version/tag
+  image-platform:
+    description: Target platform to build image for (e.g., linux/amd64, linux/arm64)
+    required: false
+    default: linux/amd64
+  push:
+    required: false
+    default: "true"
+    description: Push image to registry
+  load:
+    required: false
+    default: "false"
+    description: Load image to local docker (single-platform only)
+  cache:
+    required: false
+    default: "true"
+    description: Enable Docker layer caching
+  cache-tag:
+    required: false
+    default: buildcache
+    description: Cache tag name
+  metadata-tags:
+    description: Docker metadata-action tags input. See https://github.com/docker/metadata-action#tags-input
+    required: false
+  metadata-flavor:
+    description: Docker metadata-action flavor input. See https://github.com/docker/metadata-action#flavor-input
+    required: false
+    default: latest=false
+  build-args:
+    required: false
+    description: List of build arguments as key-value pairs (e.g., KEY=VALUE, one per line)
+    default: ""
+  secrets:
+    required: false
+    description: List of build secrets as key-value pairs (e.g., KEY=VALUE, one per line)
+    default: ""
+  build-contexts:
+    required: false
+    description: List of build contexts as key-value pairs (e.g., CONTEXT_KEY=VALUE, one per line)
+    default: ""
+  install-qemu:
+    required: false
+    default: "false"
+    description: Install QEMU for cross-platform builds
+  qemu-platforms:
+    required: false
+    description: QEMU platforms to install (defaults to image-platform if not set)
+outputs:
+  image-name:
+    description: Docker image name
+    value: ${{ steps.config.outputs.image-name }}
+  image-tag:
+    description: Docker image tag
+    value: ${{ inputs.image-version }}
+  image:
+    description: Full image reference (name:tag)
+    value: ${{ steps.config.outputs.image-name }}:${{ inputs.image-version }}
+  digest:
+    description: Image digest
+    value: ${{ steps.build.outputs.digest }}
+
+runs:
+  using: composite
+  steps:
+    - name: Dump GitHub context
+      shell: bash
+      env:
+        GITHUB_CONTEXT: ${{ toJson(github) }}
+      run: echo "$GITHUB_CONTEXT"
+
+    - id: config
+      name: Read docker config
+      shell: bash
+      env:
+        DOCKER_CONFIG_FILE: ${{ inputs.docker-config-file }}
+        IMAGE_VERSION: ${{ inputs.image-version }}
+        IMAGE_PLATFORM: ${{ inputs.image-platform }}
+        METADATA_TAGS: ${{ inputs.metadata-tags }}
+      run: |
+        # Validate docker config file exists
+        if [ ! -f "$DOCKER_CONFIG_FILE" ]; then
+          echo "::error::Docker config file not found: $DOCKER_CONFIG_FILE" && exit 1
+        fi
+
+        # Parse config file
+        image_name=$(jq -r .imageName "$DOCKER_CONFIG_FILE")
+        if [ -z "$image_name" ] || [ "$image_name" = "null" ]; then
+          echo "::error::imageName not found in $DOCKER_CONFIG_FILE" && exit 1
+        fi
+        echo "image-name: ${image_name}"
+        echo "image-name=${image_name}" >> $GITHUB_OUTPUT
+
+        dockerfile=$(jq -r '.dockerfile // "./Dockerfile"' "$DOCKER_CONFIG_FILE")
+        echo "Dockerfile: ${dockerfile}"
+        echo "dockerfile=${dockerfile}" >> $GITHUB_OUTPUT
+
+        echo "image-version: $IMAGE_VERSION"
+        echo "image-platform: $IMAGE_PLATFORM"
+        echo "metadata-tags: $METADATA_TAGS"
+
+    - name: Set up QEMU
+      if: inputs.install-qemu == 'true'
+      uses: docker/setup-qemu-action@v3
+      with:
+        platforms: ${{ inputs.qemu-platforms || inputs.image-platform }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ inputs.dockerhub-user }}
+        password: ${{ inputs.dockerhub-password }}
+
+    - name: Docker metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ steps.config.outputs.image-name }}
+        flavor: ${{ inputs.metadata-flavor }}
+        tags: ${{ inputs.metadata-tags }}
+
+    - name: Build and push
+      id: build
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        platforms: ${{ inputs.image-platform }}
+        file: ${{ steps.config.outputs.dockerfile }}
+        build-contexts: ${{ inputs.build-contexts }}
+        build-args: |
+          GIT_COMMIT=${{ github.sha }}
+          BUILDTIME=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+          VERSION=${{ inputs.image-version }}
+          REVISION=${{ inputs.image-version }}
+          BRANCH=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
+          ${{ inputs.build-args }}
+        secrets: ${{ inputs.secrets }}
+        push: ${{ inputs.push }}
+        load: ${{ inputs.load }}
+        tags: ${{ steps.config.outputs.image-name }}:${{ inputs.image-version }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: ${{ inputs.cache == 'true' && format('type=registry,ref={0}:{1}', steps.config.outputs.image-name, inputs.cache-tag) || '' }}
+        cache-to: ${{ inputs.cache == 'true' && format('type=registry,ref={0}:{1},mode=max,compression=zstd', steps.config.outputs.image-name, inputs.cache-tag) || '' }}
