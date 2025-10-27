@@ -22,3 +22,6 @@ jobs:
       - uses: open-turo/actions-gha/test@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Test shell scripts
+        run: ./manifest/test-create-manifest.sh

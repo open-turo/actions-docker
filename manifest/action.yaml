@@ -1,0 +1,50 @@
+name: Create multi-arch Docker manifest
+description: Combine platform-specific Docker images into a single multi-arch manifest
+inputs:
+  image-name:
+    required: true
+    description: Docker image name (e.g., org/image-name)
+  dockerhub-user:
+    required: true
+    description: DockerHub username
+  dockerhub-password:
+    required: true
+    description: DockerHub password
+  tags:
+    required: true
+    description: Comma-separated list of tags to apply to the manifest (e.g., 1.0.0,latest)
+  sources:
+    required: true
+    description: |
+      List of source images to combine (one per line).
+      Can be full image references with digests (e.g., org/image@sha256:abc123)
+      or image references with tags (e.g., org/image:1.0.0-amd64)
+outputs:
+  manifest:
+    description: The created manifest reference
+    value: ${{ steps.create.outputs.manifest }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ inputs.dockerhub-user }}
+        password: ${{ inputs.dockerhub-password }}
+
+    - name: Create manifest
+      id: create
+      shell: bash
+      env:
+        IMAGE_NAME: ${{ inputs.image-name }}
+        TAGS: ${{ inputs.tags }}
+        SOURCES: ${{ inputs.sources }}
+      run: |
+        ${{ github.action_path }}/create-manifest.sh \
+          "$IMAGE_NAME" \
+          "$TAGS" \
+          "$SOURCES"
