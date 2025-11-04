@@ -152,9 +152,11 @@ runs:
           BRANCH=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
           ${{ inputs.build-args }}
         secrets: ${{ inputs.secrets }}
+        # Use regular push when image-version is provided
         push: ${{ inputs.push == 'true' && inputs.image-version != '' }}
         load: ${{ inputs.load }}
-        outputs: ${{ inputs.push == 'true' && inputs.image-version == '' && 'type=registry,push-by-digest=true' || '' }}
+        # Use digest-only push when image-version is omitted
+        outputs: ${{ inputs.push == 'true' && inputs.image-version == '' && format('type=image,"name={0}",push-by-digest=true,name-canonical=true,push=true', steps.config.outputs.image-name) || '' }}
         tags: ${{ inputs.image-version && format('{0}:{1}', steps.config.outputs.image-name, inputs.image-version) || '' }}
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: ${{ inputs.cache == 'true' && format('type=registry,ref={0}:{1}', steps.config.outputs.image-name, inputs.cache-tag) || '' }}
