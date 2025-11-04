@@ -12,8 +12,8 @@ inputs:
     required: true
     description: DockerHub password
   image-version:
-    required: true
-    description: Docker image version/tag
+    required: false
+    description: Docker image version/tag (optional - if not provided, image will be pushed by digest only)
   image-platform:
     description: Target platform to build image for (e.g., linux/amd64, linux/arm64)
     required: false
@@ -65,11 +65,11 @@ outputs:
     description: Docker image name
     value: ${{ steps.config.outputs.image-name }}
   image-tag:
-    description: Docker image tag
+    description: Docker image tag (empty if image-version not provided)
     value: ${{ inputs.image-version }}
   image:
-    description: Full image reference (name:tag)
-    value: ${{ steps.config.outputs.image-name }}:${{ inputs.image-version }}
+    description: Full image reference (name:tag or name@digest if no tag)
+    value: ${{ steps.set-ref.outputs.image-ref }}
   digest:
     description: Image digest
     value: ${{ steps.build.outputs.digest }}
@@ -147,14 +147,28 @@ runs:
         build-args: |
           GIT_COMMIT=${{ github.sha }}
           BUILDTIME=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
-          VERSION=${{ inputs.image-version }}
-          REVISION=${{ inputs.image-version }}
+          ${{ inputs.image-version && format('VERSION={0}', inputs.image-version) || '' }}
+          ${{ inputs.image-version && format('REVISION={0}', inputs.image-version) || '' }}
           BRANCH=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
           ${{ inputs.build-args }}
         secrets: ${{ inputs.secrets }}
         push: ${{ inputs.push }}
         load: ${{ inputs.load }}
-        tags: ${{ steps.config.outputs.image-name }}:${{ inputs.image-version }}
+        tags: ${{ inputs.image-version && format('{0}:{1}', steps.config.outputs.image-name, inputs.image-version) || '' }}
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: ${{ inputs.cache == 'true' && format('type=registry,ref={0}:{1}', steps.config.outputs.image-name, inputs.cache-tag) || '' }}
         cache-to: ${{ inputs.cache == 'true' && format('type=registry,ref={0}:{1},mode=max,compression=zstd', steps.config.outputs.image-name, inputs.cache-tag) || '' }}
+
+    - name: Set image reference output
+      id: set-ref
+      shell: bash
+      env:
+        IMAGE_NAME: ${{ steps.config.outputs.image-name }}
+        IMAGE_VERSION: ${{ inputs.image-version }}
+        IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+      run: |
+        if [ -n "$IMAGE_VERSION" ]; then
+          echo "image-ref=${IMAGE_NAME}:${IMAGE_VERSION}" >> $GITHUB_OUTPUT
+        else
+          echo "image-ref=${IMAGE_NAME}@${IMAGE_DIGEST}" >> $GITHUB_OUTPUT
+        fi
