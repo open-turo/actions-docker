@@ -50,7 +50,8 @@ jobs:
         with:
           dockerhub-user: ${{ secrets.DOCKER_USERNAME }}
           dockerhub-password: ${{ secrets.DOCKER_PASSWORD }}
-          image-version: 1.0.0
+          # Omit image-version to push by digest only (no tags)
+          # Or provide image-version: 1.0.0-amd64 for architecture-specific tags
           image-platform: linux/amd64
           push: true
 
@@ -69,7 +70,8 @@ jobs:
         with:
           dockerhub-user: ${{ secrets.DOCKER_USERNAME }}
           dockerhub-password: ${{ secrets.DOCKER_PASSWORD }}
-          image-version: 1.0.0
+          # Omit image-version to push by digest only (no tags)
+          # Or provide image-version: 1.0.0-arm64 for architecture-specific tags
           image-platform: linux/arm64
           push: true
 
@@ -95,12 +97,15 @@ jobs:
 ### How It Works
 
 1. **Build Phase**: Each platform (AMD64, ARM64) is built separately on native runners
-2. **Push Phase**: Each platform-specific image is pushed to the registry with the same tags
+2. **Push Phase**: Each platform-specific image is pushed to the registry
+   - **Digest-only push**: Omit `image-version` to push without creating tags (cleanest approach)
+   - **Architecture-tagged push**: Provide `image-version` with arch suffix (e.g., `1.0.0-amd64`) for intermediate tags
 3. **Manifest Phase**: The manifest action combines the platform images using their digests into a single multi-arch manifest
 4. **Pull Phase**: When users pull the image, Docker automatically selects the appropriate platform-specific image
 
 ### Notes
 
+- **Digest-only Builds**: When `image-version` is omitted, images are pushed by digest only without creating tags. This is the cleanest approach for multi-arch workflows as only the final manifest creates user-facing tags.
 - **Digests vs Tags**: Using digests (e.g., `@sha256:...`) is more reliable than tags as it ensures you're referencing the exact image that was built
 - **Multiple Tags**: You can create multiple tags for the same manifest (e.g., `1.0.0` and `latest`) by providing a comma-separated list
 - **Native Performance**: Cross-platform builds using QEMU are significantly slower than native builds. Use native runners when possible.
