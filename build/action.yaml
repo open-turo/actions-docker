@@ -152,8 +152,9 @@ runs:
           BRANCH=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
           ${{ inputs.build-args }}
         secrets: ${{ inputs.secrets }}
-        push: ${{ inputs.push }}
+        push: ${{ inputs.push == 'true' && inputs.image-version != '' }}
         load: ${{ inputs.load }}
+        outputs: ${{ inputs.push == 'true' && inputs.image-version == '' && 'type=registry,push-by-digest=true' || '' }}
         tags: ${{ inputs.image-version && format('{0}:{1}', steps.config.outputs.image-name, inputs.image-version) || '' }}
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: ${{ inputs.cache == 'true' && format('type=registry,ref={0}:{1}', steps.config.outputs.image-name, inputs.cache-tag) || '' }}
