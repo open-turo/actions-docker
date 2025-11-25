@@ -24,6 +24,7 @@ Create a `.docker-config.json` file in your repository root:
 
 - `imageName` (required): Docker image name in format `org/name`
 - `dockerfile` (optional): Path to Dockerfile, defaults to `./Dockerfile`
+- `target` (optional): Build target stage for multi-stage builds. When specified, all image tags will automatically be suffixed with `-{target}`
 
 **Example:**
 
@@ -33,6 +34,18 @@ Create a `.docker-config.json` file in your repository root:
   "dockerfile": "./Dockerfile"
 }
 ```
+
+**Example with target:**
+
+```json
+{
+  "imageName": "turo/my-microservice",
+  "dockerfile": "./Dockerfile",
+  "target": "dev"
+}
+```
+
+This will build the `dev` stage and automatically tag images with the `-dev` suffix (e.g., `1.0.0-dev` instead of `1.0.0`).
 
 ## Usage
 
