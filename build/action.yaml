@@ -116,6 +116,19 @@ runs:
         echo "Dockerfile: ${dockerfile}"
         echo "dockerfile=${dockerfile}" >> $GITHUB_OUTPUT
 
+        target=$(jq -r '.target // ""' "$DOCKER_CONFIG_FILE")
+        echo "Target: ${target}"
+        echo "target=${target}" >> $GITHUB_OUTPUT
+
+        # Set tag suffix if target is specified
+        if [ -n "$target" ]; then
+          tag_suffix="-${target}"
+        else
+          tag_suffix=""
+        fi
+        echo "Tag suffix: ${tag_suffix}"
+        echo "tag-suffix=${tag_suffix}" >> $GITHUB_OUTPUT
+
     - name: Set up QEMU
       if: inputs.install-qemu == 'true'
       uses: docker/setup-qemu-action@v3
@@ -137,7 +150,9 @@ runs:
       uses: docker/metadata-action@v5
       with:
         images: ${{ steps.config.outputs.image-name }}
-        flavor: ${{ inputs.metadata-flavor }}
+        flavor: |
+          ${{ inputs.metadata-flavor }}
+          suffix=${{ steps.config.outputs.tag-suffix }}
         tags: ${{ inputs.metadata-tags }}
 
     - name: Build and push
@@ -147,6 +162,7 @@ runs:
         context: .
         platforms: ${{ inputs.image-platform }}
         file: ${{ steps.config.outputs.dockerfile }}
+        target: ${{ steps.config.outputs.target }}
         build-contexts: ${{ inputs.build-contexts }}
         build-args: |
           GIT_COMMIT=${{ github.sha }}
