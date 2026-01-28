@@ -36,7 +36,7 @@ inputs:
     default: buildcache
     description: Cache tag name
   metadata-tags:
-    description: Docker metadata-action tags input. See https://github.com/docker/metadata-action#tags-input
+    description: Docker metadata-action tags input. See https://github.com/docker/metadata-action#tags-input. Config file value overrides this input if present.
     required: false
     default: |
       type=ref,event=branch
@@ -45,7 +45,7 @@ inputs:
       type=semver,pattern={{major}}.{{minor}}
       type=semver,pattern={{major}}
   metadata-flavor:
-    description: Docker metadata-action flavor input. See https://github.com/docker/metadata-action#flavor-input
+    description: Docker metadata-action flavor input. See https://github.com/docker/metadata-action#flavor-input. Config file value overrides this input if present.
     required: false
     default: latest=false
   build-args:
@@ -98,36 +98,29 @@ runs:
       shell: bash
       env:
         DOCKER_CONFIG_FILE: ${{ inputs.docker-config-file }}
+      run: ${{ github.action_path }}/../shared/read-docker-config.sh "$DOCKER_CONFIG_FILE"
+
+    - id: resolve-metadata
+      name: Resolve metadata inputs
+      shell: bash
+      env:
+        INPUT_METADATA_TAGS: ${{ inputs.metadata-tags }}
+        INPUT_METADATA_FLAVOR: ${{ inputs.metadata-flavor }}
+        CONFIG_METADATA_TAGS: ${{ steps.config.outputs.metadata-tags }}
+        CONFIG_METADATA_FLAVOR: ${{ steps.config.outputs.metadata-flavor }}
       run: |
-        # Validate docker config file exists
-        if [ ! -f "$DOCKER_CONFIG_FILE" ]; then
-          echo "::error::Docker config file not found: $DOCKER_CONFIG_FILE" && exit 1
-        fi
-
-        # Parse config file
-        image_name=$(jq -r .imageName "$DOCKER_CONFIG_FILE")
-        if [ -z "$image_name" ] || [ "$image_name" = "null" ]; then
-          echo "::error::imageName not found in $DOCKER_CONFIG_FILE" && exit 1
-        fi
-        echo "image-name: ${image_name}"
-        echo "image-name=${image_name}" >> $GITHUB_OUTPUT
-
-        dockerfile=$(jq -r '.dockerfile // "./Dockerfile"' "$DOCKER_CONFIG_FILE")
-        echo "Dockerfile: ${dockerfile}"
-        echo "dockerfile=${dockerfile}" >> $GITHUB_OUTPUT
-
-        target=$(jq -r '.target // ""' "$DOCKER_CONFIG_FILE")
-        echo "Target: ${target}"
-        echo "target=${target}" >> $GITHUB_OUTPUT
-
-        # Set tag suffix if target is specified
-        if [ -n "$target" ]; then
-          tag_suffix="-${target}"
+        # Use config value if present, otherwise use input
+        if [ -n "$CONFIG_METADATA_TAGS" ]; then
+          echo "metadata-tags=${CONFIG_METADATA_TAGS}" >> $GITHUB_OUTPUT
         else
-          tag_suffix=""
+          echo "metadata-tags=${INPUT_METADATA_TAGS}" >> $GITHUB_OUTPUT
         fi
-        echo "Tag suffix: ${tag_suffix}"
-        echo "tag-suffix=${tag_suffix}" >> $GITHUB_OUTPUT
+
+        if [ -n "$CONFIG_METADATA_FLAVOR" ]; then
+          echo "metadata-flavor=${CONFIG_METADATA_FLAVOR}" >> $GITHUB_OUTPUT
+        else
+          echo "metadata-flavor=${INPUT_METADATA_FLAVOR}" >> $GITHUB_OUTPUT
+        fi
 
     - name: Set up QEMU
       if: inputs.install-qemu == 'true'
@@ -151,9 +144,9 @@ runs:
       with:
         images: ${{ steps.config.outputs.image-name }}
         flavor: |
-          ${{ inputs.metadata-flavor }}
+          ${{ steps.resolve-metadata.outputs.metadata-flavor }}
           suffix=${{ steps.config.outputs.tag-suffix }}
-        tags: ${{ inputs.metadata-tags }}
+        tags: ${{ steps.resolve-metadata.outputs.metadata-tags }}
 
     - name: Build and push
       id: build
