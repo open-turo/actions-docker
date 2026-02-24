@@ -1,9 +1,13 @@
 name: Create multi-arch Docker manifest
 description: Combine platform-specific Docker images into a single multi-arch manifest
 inputs:
+  docker-config-file:
+    required: false
+    description: Path to the docker config file (defaults to .docker-config.json) Must contain imageName, may contain metadata-tags and metadata-flavor.
+    default: .docker-config.json
   image-name:
-    required: true
-    description: Docker image name (e.g., org/image-name)
+    required: false
+    description: Docker image name (e.g., org/image-name). If not provided, read from config file.
   dockerhub-user:
     required: true
     description: DockerHub username
@@ -11,7 +15,7 @@ inputs:
     required: true
     description: DockerHub password
   metadata-tags:
-    description: Docker metadata-action tags input. See https://github.com/docker/metadata-action#tags-input
+    description: Docker metadata-action tags input. See https://github.com/docker/metadata-action#tags-input. Config file value overrides this input if present.
     required: false
     default: |
       type=ref,event=branch
@@ -20,7 +24,7 @@ inputs:
       type=semver,pattern={{major}}.{{minor}}
       type=semver,pattern={{major}}
   metadata-flavor:
-    description: Docker metadata-action flavor input. See https://github.com/docker/metadata-action#flavor-input
+    description: Docker metadata-action flavor input. See https://github.com/docker/metadata-action#flavor-input. Config file value overrides this input if present.
     required: false
     default: latest=false
   sources:
@@ -52,19 +56,62 @@ runs:
         username: ${{ inputs.dockerhub-user }}
         password: ${{ inputs.dockerhub-password }}
 
+    - id: config
+      name: Read docker config
+      shell: bash
+      env:
+        DOCKER_CONFIG_FILE: ${{ inputs.docker-config-file }}
+      run: ${{ github.action_path }}/../shared/read-docker-config.sh "$DOCKER_CONFIG_FILE"
+
+    - id: resolve-image-name
+      name: Resolve image name
+      shell: bash
+      env:
+        INPUT_IMAGE_NAME: ${{ inputs.image-name }}
+        CONFIG_IMAGE_NAME: ${{ steps.config.outputs.image-name }}
+      run: |
+        # Use input if provided, otherwise use config
+        if [ -n "$INPUT_IMAGE_NAME" ]; then
+          echo "image-name=${INPUT_IMAGE_NAME}" >> $GITHUB_OUTPUT
+        else
+          echo "image-name=${CONFIG_IMAGE_NAME}" >> $GITHUB_OUTPUT
+        fi
+
+    - id: resolve-metadata
+      name: Resolve metadata inputs
+      shell: bash
+      env:
+        INPUT_METADATA_TAGS: ${{ inputs.metadata-tags }}
+        INPUT_METADATA_FLAVOR: ${{ inputs.metadata-flavor }}
+        CONFIG_METADATA_TAGS: ${{ steps.config.outputs.metadata-tags }}
+        CONFIG_METADATA_FLAVOR: ${{ steps.config.outputs.metadata-flavor }}
+      run: |
+        # Use config value if present, otherwise use input
+        if [ -n "$CONFIG_METADATA_TAGS" ]; then
+          echo "metadata-tags=${CONFIG_METADATA_TAGS}" >> $GITHUB_OUTPUT
+        else
+          echo "metadata-tags=${INPUT_METADATA_TAGS}" >> $GITHUB_OUTPUT
+        fi
+
+        if [ -n "$CONFIG_METADATA_FLAVOR" ]; then
+          echo "metadata-flavor=${CONFIG_METADATA_FLAVOR}" >> $GITHUB_OUTPUT
+        else
+          echo "metadata-flavor=${INPUT_METADATA_FLAVOR}" >> $GITHUB_OUTPUT
+        fi
+
     - name: Docker metadata
       id: meta
       uses: docker/metadata-action@v5
       with:
-        images: ${{ inputs.image-name }}
-        flavor: ${{ inputs.metadata-flavor }}
-        tags: ${{ inputs.metadata-tags }}
+        images: ${{ steps.resolve-image-name.outputs.image-name }}
+        flavor: ${{ steps.resolve-metadata.outputs.metadata-flavor }}
+        tags: ${{ steps.resolve-metadata.outputs.metadata-tags }}
 
     - name: Create manifest
       id: create
       shell: bash
       env:
-        IMAGE_NAME: ${{ inputs.image-name }}
+        IMAGE_NAME: ${{ steps.resolve-image-name.outputs.image-name }}
         METADATA_TAGS: ${{ steps.meta.outputs.tags }}
         SOURCES: ${{ inputs.sources }}
       run: |

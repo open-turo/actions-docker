@@ -7,7 +7,7 @@ Combine platform-specific Docker images into a single multi-arch manifest.
 - Combine ARM64 and AMD64 images built on native runners
 - Support multiple tags for the manifest
 - Use Docker Buildx imagetools for manifest creation
-- Simple, explicit inputs (no config file needed)
+- Read configuration from `.docker-config.json` or use explicit inputs
 - Outputs manifest reference for further use
 
 ## Usage
@@ -21,11 +21,40 @@ Combine platform-specific Docker images into a single multi-arch manifest.
     image-name: myorg/myimage
     dockerhub-user: ${{ secrets.DOCKER_USERNAME }}
     dockerhub-password: ${{ secrets.DOCKER_PASSWORD }}
-    tags: 1.0.0,latest
+    metadata-tags: |
+      type=semver,pattern={{version}}
+      type=semver,pattern={{major}}.{{minor}}
     sources: |
       myorg/myimage@${{ needs.build-amd64.outputs.digest }}
       myorg/myimage@${{ needs.build-arm64.outputs.digest }}
 ```
+
+### Using Config File
+
+If you have a `.docker-config.json` file (same as used by the build action), you can omit the `image-name` and metadata inputs:
+
+```json
+{
+  "imageName": "myorg/myimage",
+  "metadata-tags": "type=semver,pattern={{version}}\ntype=semver,pattern={{major}}.{{minor}}",
+  "metadata-flavor": "latest=true"
+}
+```
+
+```yaml
+- name: Create multi-arch manifest
+  uses: open-turo/actions-docker/manifest@v1
+  with:
+    dockerhub-user: ${{ secrets.DOCKER_USERNAME }}
+    dockerhub-password: ${{ secrets.DOCKER_PASSWORD }}
+    sources: |
+      myorg/myimage@${{ needs.build-amd64.outputs.digest }}
+      myorg/myimage@${{ needs.build-arm64.outputs.digest }}
+```
+
+The action will read `image-name`, `metadata-tags`, and `metadata-flavor` from the config file. Values in the config file override action inputs.
+
+**Note:** The `dockerfile` and `target` fields in the config file are only used by the build action and are ignored by the manifest action.
 
 ### Using Tag-Based References
 
@@ -38,7 +67,9 @@ Instead of digests, you can also use tag-based references:
     image-name: myorg/myimage
     dockerhub-user: ${{ secrets.DOCKER_USERNAME }}
     dockerhub-password: ${{ secrets.DOCKER_PASSWORD }}
-    tags: 1.0.0,latest
+    metadata-tags: |
+      type=semver,pattern={{version}}
+    metadata-flavor: latest=true
     sources: |
       myorg/myimage:1.0.0-amd64
       myorg/myimage:1.0.0-arm64
@@ -46,13 +77,15 @@ Instead of digests, you can also use tag-based references:
 
 ## Inputs
 
-| Name                 | Description                                                                                          | Required |
-| -------------------- | ---------------------------------------------------------------------------------------------------- | -------- |
-| `image-name`         | Docker image name (e.g., org/image-name)                                                             | Yes      |
-| `dockerhub-user`     | DockerHub username                                                                                   | Yes      |
-| `dockerhub-password` | DockerHub password                                                                                   | Yes      |
-| `tags`               | Comma-separated list of tags to apply to the manifest (e.g., 1.0.0,latest)                           | Yes      |
-| `sources`            | List of source images to combine (one per line). Can be digests or tags (e.g., org/image@sha256:...) | Yes      |
+| Name                 | Description                                                                                          | Required | Default               |
+| -------------------- | ---------------------------------------------------------------------------------------------------- | -------- | --------------------- |
+| `docker-config-file` | Path to docker config file                                                                           | No       | `.docker-config.json` |
+| `image-name`         | Docker image name (e.g., org/image-name). If not provided, read from config file.                    | No       |                       |
+| `dockerhub-user`     | DockerHub username                                                                                   | Yes      |                       |
+| `dockerhub-password` | DockerHub password                                                                                   | Yes      |                       |
+| `metadata-tags`      | Docker metadata-action tags input. If specified in config file, config value is used.                | No       |                       |
+| `metadata-flavor`    | Docker metadata-action flavor input. If specified in config file, config value is used.              | No       | `latest=false`        |
+| `sources`            | List of source images to combine (one per line). Can be digests or tags (e.g., org/image@sha256:...) | Yes      |                       |
 
 ## Outputs
 

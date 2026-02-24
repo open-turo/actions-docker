@@ -25,6 +25,8 @@ Create a `.docker-config.json` file in your repository root:
 - `imageName` (required): Docker image name in format `org/name`
 - `dockerfile` (optional): Path to Dockerfile, defaults to `./Dockerfile`
 - `target` (optional): Build target stage for multi-stage builds. When specified, all image tags will automatically be suffixed with `-{target}`
+- `metadata-tags` (optional): Docker metadata-action tags input (multiline string). If specified, overrides the action input.
+- `metadata-flavor` (optional): Docker metadata-action flavor input (multiline string). If specified, overrides the action input.
 
 **Example:**
 
@@ -46,6 +48,33 @@ Create a `.docker-config.json` file in your repository root:
 ```
 
 This will build the `dev` stage and automatically tag images with the `-dev` suffix (e.g., `1.0.0-dev` instead of `1.0.0`).
+
+**Example with custom metadata:**
+
+```json
+{
+  "imageName": "turo/my-microservice",
+  "dockerfile": "./Dockerfile",
+  "metadata-tags": "type=semver,pattern={{version}}\ntype=semver,pattern={{major}}.{{minor}}",
+  "metadata-flavor": "latest=true"
+}
+```
+
+This allows you to centralize Docker metadata configuration in the config file rather than duplicating it across workflows.
+
+**Complete example with all options:**
+
+```json
+{
+  "imageName": "turo/my-microservice",
+  "dockerfile": "./Dockerfile",
+  "target": "production",
+  "metadata-tags": "type=ref,event=branch\ntype=ref,event=pr\ntype=semver,pattern={{version}}\ntype=semver,pattern={{major}}.{{minor}}\ntype=semver,pattern={{major}}",
+  "metadata-flavor": "latest=false"
+}
+```
+
+Note: When specifying multiline values in JSON, use `\n` for newlines.
 
 ## Usage
 
