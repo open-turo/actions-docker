@@ -27,6 +27,23 @@ Combine platform-specific Docker images into a single multi-arch manifest.
       myorg/myimage@${{ needs.build-arm64.outputs.digest }}
 ```
 
+### Using Docker Config File
+
+If you have a `.docker-config.json` file (same format as the build action), you can reference it instead of providing the image name directly:
+
+```yaml
+- name: Create multi-arch manifest
+  uses: open-turo/actions-docker/manifest@v1
+  with:
+    docker-config-file: .docker-config.json
+    dockerhub-user: ${{ secrets.DOCKER_USERNAME }}
+    dockerhub-password: ${{ secrets.DOCKER_PASSWORD }}
+    tags: 1.0.0,latest
+    sources: |
+      ${{ needs.build-amd64.outputs.image }}
+      ${{ needs.build-arm64.outputs.image }}
+```
+
 ### Using Tag-Based References
 
 Instead of digests, you can also use tag-based references:
@@ -46,13 +63,15 @@ Instead of digests, you can also use tag-based references:
 
 ## Inputs
 
-| Name                 | Description                                                                                          | Required |
-| -------------------- | ---------------------------------------------------------------------------------------------------- | -------- |
-| `image-name`         | Docker image name (e.g., org/image-name)                                                             | Yes      |
-| `dockerhub-user`     | DockerHub username                                                                                   | Yes      |
-| `dockerhub-password` | DockerHub password                                                                                   | Yes      |
-| `tags`               | Comma-separated list of tags to apply to the manifest (e.g., 1.0.0,latest)                           | Yes      |
-| `sources`            | List of source images to combine (one per line). Can be digests or tags (e.g., org/image@sha256:...) | Yes      |
+| Name                 | Description                                                                                             | Required    | Default        |
+| -------------------- | ------------------------------------------------------------------------------------------------------- | ----------- | -------------- |
+| `docker-config-file` | Path to docker config file. If provided, image-name will be read from config                            | No          |                |
+| `image-name`         | Docker image name (e.g., org/image-name). Required if docker-config-file is not provided                | Conditional |                |
+| `dockerhub-user`     | DockerHub username                                                                                      | Yes         |                |
+| `dockerhub-password` | DockerHub password                                                                                      | Yes         |                |
+| `metadata-tags`      | Docker metadata-action tags input. See [docs](https://github.com/docker/metadata-action#tags-input)     | No          | See action     |
+| `metadata-flavor`    | Docker metadata-action flavor input. See [docs](https://github.com/docker/metadata-action#flavor-input) | No          | `latest=false` |
+| `sources`            | List of source images to combine (one per line). Can be digests or tags (e.g., org/image@sha256:...)    | Yes         |                |
 
 ## Outputs
 

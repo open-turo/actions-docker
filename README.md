@@ -12,6 +12,12 @@ Build and push Docker images with native or cross-platform support.
 
 Combine platform-specific Docker images into a single multi-arch manifest.
 
+### [read-config](./read-config)
+
+Read and validate Docker configuration files (`.docker-config.json`). This is a reusable action that centralizes config reading logic used by both `build` and `manifest` actions. Can also be used independently in custom workflows.
+
+**Key benefit**: Repositories with multiple services/images can use the same workflow for all builds by simply specifying different config files. See [Multi-Service Repositories](#multi-service-repositories) below.
+
 ## Multi-Architecture Builds
 
 Build Docker images for multiple architectures (AMD64, ARM64) using native runners for optimal performance.
@@ -109,3 +115,36 @@ jobs:
 - **Digests vs Tags**: Using digests (e.g., `@sha256:...`) is more reliable than tags as it ensures you're referencing the exact image that was built
 - **Multiple Tags**: You can create multiple tags for the same manifest (e.g., `1.0.0` and `latest`) by providing a comma-separated list
 - **Native Performance**: Cross-platform builds using QEMU are significantly slower than native builds. Use native runners when possible.
+
+## Multi-Service Repositories
+
+Repositories with multiple services can use the same workflow for all builds by using different config files. Each service has its own `.docker-config.json` specifying image name, dockerfile path, target, and suffix.
+
+### Example: Matrix Build
+
+```yaml
+# .github/workflows/build-services.yaml
+jobs:
+  build:
+    strategy:
+      matrix:
+        service: [api, worker, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build ${{ matrix.service }}
+        uses: open-turo/actions-docker/build@v1
+        with:
+          docker-config-file: services/${{ matrix.service }}/.docker-config.json
+          dockerhub-user: ${{ secrets.DOCKER_USERNAME }}
+          dockerhub-password: ${{ secrets.DOCKER_PASSWORD }}
+```
+
+Each service maintains its own config:
+
+- `services/api/.docker-config.json`
+- `services/worker/.docker-config.json`
+- `services/frontend/.docker-config.json`
+
+**Benefits**: No workflow duplication, consistent build process, easy to add new services.
