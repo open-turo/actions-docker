@@ -1,0 +1,33 @@
+name: Read Docker Config
+description: Read and validate docker configuration file
+inputs:
+  docker-config-file:
+    required: false
+    description: Path to the docker config file (defaults to .docker-config.json). Must contain imageName, may contain dockerfile, suffix, target.
+    default: .docker-config.json
+outputs:
+  image-name:
+    description: Docker image name from config
+    value: ${{ steps.parse.outputs.image-name }}
+  dockerfile:
+    description: Path to Dockerfile (defaults to ./Dockerfile if not specified in config)
+    value: ${{ steps.parse.outputs.dockerfile }}
+  suffix:
+    description: Custom suffix from config (empty if not specified)
+    value: ${{ steps.parse.outputs.suffix }}
+  target:
+    description: Build target stage for multi-stage builds (empty if not specified)
+    value: ${{ steps.parse.outputs.target }}
+  tag-suffix:
+    description: Combined tag suffix. If both suffix and target specified, "-suffix-target". If only one, "-value". Otherwise empty.
+    value: ${{ steps.parse.outputs.tag-suffix }}
+
+runs:
+  using: composite
+  steps:
+    - id: parse
+      name: Read and validate docker config
+      shell: bash
+      env:
+        DOCKER_CONFIG_FILE: ${{ inputs.docker-config-file }}
+      run: ${{ github.action_path }}/parse-config.sh "$DOCKER_CONFIG_FILE"

@@ -1,6 +1,7 @@
 # GitHub Action Build Docker
 
 Build and push Docker images with native or cross-platform support.
+Push with tags for single image builds, by digest for multi arch builds, or load to local docker for testing. Supports flexible build arguments, secrets, and contexts. Caches layers in registry for faster subsequent builds.
 
 ## Features
 
@@ -24,7 +25,15 @@ Create a `.docker-config.json` file in your repository root:
 
 - `imageName` (required): Docker image name in format `org/name`
 - `dockerfile` (optional): Path to Dockerfile, defaults to `./Dockerfile`
-- `target` (optional): Build target stage for multi-stage builds. When specified, all image tags will automatically be suffixed with `-{target}`
+- `suffix` (optional): Custom suffix for image tags (e.g., `v2`)
+- `target` (optional): Build target stage for multi-stage builds (e.g., `dev`)
+
+**Tag Suffix Logic**: Image tags are automatically suffixed based on `suffix` and `target`:
+
+- Both specified: `-suffix-target` (e.g., `v2` + `dev` → tags like `1.0.0-v2-dev`)
+- Only suffix: `-suffix` (e.g., `v2` → tags like `1.0.0-v2`)
+- Only target: `-target` (e.g., `dev` → tags like `1.0.0-dev`)
+- Neither: no suffix (e.g., `1.0.0`)
 
 **Example:**
 
@@ -46,6 +55,19 @@ Create a `.docker-config.json` file in your repository root:
 ```
 
 This will build the `dev` stage and automatically tag images with the `-dev` suffix (e.g., `1.0.0-dev` instead of `1.0.0`).
+
+**Example with suffix and target:**
+
+```json
+{
+  "imageName": "turo/my-microservice",
+  "dockerfile": "./Dockerfile",
+  "suffix": "v2",
+  "target": "prod"
+}
+```
+
+This will build the `prod` stage and automatically tag images with the combined `-v2-prod` suffix (e.g., `1.0.0-v2-prod`).
 
 ## Usage
 
@@ -194,7 +216,7 @@ steps:
 
 ## Multi-Architecture Builds
 
-For multi-architecture images, invoke this action separately for each platform, then create a manifest:
+For multi-architecture images, invoke this action separately for each platform with push-by-digest, then create a manifest:
 
 ```yaml
 jobs:

@@ -93,41 +93,11 @@ runs:
         GITHUB_CONTEXT: ${{ toJson(github) }}
       run: echo "$GITHUB_CONTEXT"
 
-    - id: config
-      name: Read docker config
-      shell: bash
-      env:
-        DOCKER_CONFIG_FILE: ${{ inputs.docker-config-file }}
-      run: |
-        # Validate docker config file exists
-        if [ ! -f "$DOCKER_CONFIG_FILE" ]; then
-          echo "::error::Docker config file not found: $DOCKER_CONFIG_FILE" && exit 1
-        fi
-
-        # Parse config file
-        image_name=$(jq -r .imageName "$DOCKER_CONFIG_FILE")
-        if [ -z "$image_name" ] || [ "$image_name" = "null" ]; then
-          echo "::error::imageName not found in $DOCKER_CONFIG_FILE" && exit 1
-        fi
-        echo "image-name: ${image_name}"
-        echo "image-name=${image_name}" >> $GITHUB_OUTPUT
-
-        dockerfile=$(jq -r '.dockerfile // "./Dockerfile"' "$DOCKER_CONFIG_FILE")
-        echo "Dockerfile: ${dockerfile}"
-        echo "dockerfile=${dockerfile}" >> $GITHUB_OUTPUT
-
-        target=$(jq -r '.target // ""' "$DOCKER_CONFIG_FILE")
-        echo "Target: ${target}"
-        echo "target=${target}" >> $GITHUB_OUTPUT
-
-        # Set tag suffix if target is specified
-        if [ -n "$target" ]; then
-          tag_suffix="-${target}"
-        else
-          tag_suffix=""
-        fi
-        echo "Tag suffix: ${tag_suffix}"
-        echo "tag-suffix=${tag_suffix}" >> $GITHUB_OUTPUT
+    - name: Read docker config
+      id: config
+      uses: open-turo/actions-docker/read-config@v1
+      with:
+        docker-config-file: ${{ inputs.docker-config-file }}
 
     - name: Set up QEMU
       if: inputs.install-qemu == 'true'
