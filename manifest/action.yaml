@@ -59,6 +59,7 @@ runs:
         DOCKER_CONFIG_FILE: ${{ inputs.docker-config-file }}
         IMAGE_NAME_INPUT: ${{ inputs.image-name }}
         CONFIG_IMAGE_NAME: ${{ steps.config.outputs.image-name }}
+        CONFIG_TAG_SUFFIX: ${{ steps.config.outputs.tag-suffix }}
       run: |
         # Determine the image name to use
         if [ -n "$DOCKER_CONFIG_FILE" ]; then
@@ -68,6 +69,7 @@ runs:
           fi
           IMAGE_NAME="$CONFIG_IMAGE_NAME"
           echo "Using image name from config: $IMAGE_NAME"
+          echo "Using tag suffix from config: $CONFIG_TAG_SUFFIX"
         else
           # Use direct input
           if [ -z "$IMAGE_NAME_INPUT" ]; then
@@ -77,6 +79,7 @@ runs:
           echo "Using image name from input: $IMAGE_NAME"
         fi
         echo "RESOLVED_IMAGE_NAME=${IMAGE_NAME}" >> $GITHUB_ENV
+        echo "RESOLVED_TAG_SUFFIX=${CONFIG_TAG_SUFFIX}" >> $GITHUB_ENV
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -92,7 +95,9 @@ runs:
       uses: docker/metadata-action@v5
       with:
         images: ${{ env.RESOLVED_IMAGE_NAME }}
-        flavor: ${{ inputs.metadata-flavor }}
+        flavor: |
+          ${{ inputs.metadata-flavor }}
+          suffix=${{ env.RESOLVED_TAG_SUFFIX }}
         tags: ${{ inputs.metadata-tags }}
 
     - name: Create manifest
