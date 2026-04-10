@@ -56,9 +56,21 @@ for tag in "${TAG_ARRAY[@]}"; do
   echo "Executing: docker buildx imagetools create -t ${manifest_ref} ${SOURCE_ARRAY_FILTERED[*]}"
   docker buildx imagetools create -t "${manifest_ref}" "${SOURCE_ARRAY_FILTERED[@]}"
 
-  # Inspect the created manifest
+  # Inspect the created manifest (retry to handle delay in registry)
   echo "Inspecting manifest: ${manifest_ref}"
-  docker buildx imagetools inspect "${manifest_ref}"
+  inspect_retries=5
+  inspect_delay=5
+  for ((i = 1; i <= inspect_retries; i++)); do
+    if docker buildx imagetools inspect "${manifest_ref}"; then
+      break
+    fi
+    if [ "$i" -eq "$inspect_retries" ]; then
+      echo "::error::Failed to inspect manifest ${manifest_ref} after ${inspect_retries} attempts"
+      exit 1
+    fi
+    echo "Inspect attempt ${i} failed, retrying in ${inspect_delay}s..."
+    sleep "${inspect_delay}"
+  done
 done
 
 # Output the first tag as the primary manifest reference
