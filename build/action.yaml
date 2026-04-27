@@ -116,7 +116,7 @@ runs:
 
     - name: Docker metadata
       id: meta
-      if: inputs.push == 'true' && inputs.push-by-digest == 'false'
+      if: (inputs.push == 'true' || inputs.load == 'true') && inputs.push-by-digest == 'false'
       uses: docker/metadata-action@v6
       with:
         images: ${{ steps.config.outputs.image-name }}
