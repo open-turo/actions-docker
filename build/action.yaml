@@ -122,6 +122,14 @@ runs:
         username: ${{ inputs.dockerhub-user }}
         password: ${{ inputs.dockerhub-password }}
 
+    - name: Compute cache tag
+      id: cache-tag
+      shell: bash
+      env:
+        CACHE_TAG: ${{ inputs.cache-tag }}
+        IMAGE_PLATFORM: ${{ inputs.image-platform }}
+      run: echo "value=${CACHE_TAG}-${IMAGE_PLATFORM##*/}" >> $GITHUB_OUTPUT
+
     - name: Docker metadata
       id: meta
       if: (inputs.push == 'true' || inputs.load == 'true') && inputs.push-by-digest == 'false'
@@ -154,8 +162,8 @@ runs:
         # Use metadata-generated tags when pushing with tags
         tags: ${{ inputs.push-by-digest == 'false' && steps.meta.outputs.tags || '' }}
         labels: ${{ inputs.push-by-digest == 'false' && steps.meta.outputs.labels || '' }}
-        cache-from: ${{ inputs.cache-from != '' && inputs.cache-from || (inputs.cache == 'true' && format('type=registry,ref={0}:{1}', steps.config.outputs.image-name, inputs.cache-tag) || '') }}
-        cache-to: ${{ inputs.cache-to != '' && inputs.cache-to || (inputs.cache == 'true' && format('type=registry,ref={0}:{1},mode=max,compression=zstd', steps.config.outputs.image-name, inputs.cache-tag) || '') }}
+        cache-from: ${{ inputs.cache-from != '' && inputs.cache-from || (inputs.cache == 'true' && format('type=registry,ref={0}:{1}', steps.config.outputs.image-name, steps.cache-tag.outputs.value) || '') }}
+        cache-to: ${{ inputs.cache-to != '' && inputs.cache-to || (inputs.cache == 'true' && format('type=registry,ref={0}:{1},mode=max,compression=zstd', steps.config.outputs.image-name, steps.cache-tag.outputs.value) || '') }}
 
     - name: Set image reference output
       id: set-ref
