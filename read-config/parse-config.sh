@@ -6,6 +6,7 @@ set -e
 #   $1: Path to docker config file
 # Outputs to GITHUB_OUTPUT:
 #   image-name: Docker image name
+#   context: Build context directory
 #   dockerfile: Path to Dockerfile
 #   suffix: Custom suffix
 #   target: Build target
@@ -26,7 +27,9 @@ if [ -z "$image_name" ] || [ "$image_name" = "null" ]; then
   exit 1
 fi
 
-dockerfile=$(jq -r '.dockerfile // "./Dockerfile"' "$DOCKER_CONFIG_FILE")
+context=$(jq -r '.context // "."' "$DOCKER_CONFIG_FILE")
+# The Dockerfile defaults to the one in the build context.
+dockerfile=$(jq -r --arg context "$context" '.dockerfile // ($context + "/Dockerfile")' "$DOCKER_CONFIG_FILE")
 suffix=$(jq -r '.suffix // ""' "$DOCKER_CONFIG_FILE")
 target=$(jq -r '.target // ""' "$DOCKER_CONFIG_FILE")
 
@@ -46,6 +49,7 @@ fi
 
 # Output results
 echo "image-name: ${image_name}"
+echo "Context: ${context}"
 echo "Dockerfile: ${dockerfile}"
 echo "Suffix: ${suffix}"
 echo "Target: ${target}"
@@ -55,6 +59,7 @@ echo "Tag suffix: ${tag_suffix}"
 if [ -n "$GITHUB_OUTPUT" ]; then
   {
     echo "image-name=${image_name}"
+    echo "context=${context}"
     echo "dockerfile=${dockerfile}"
     echo "suffix=${suffix}"
     echo "target=${target}"

@@ -24,7 +24,8 @@ Create a `.docker-config.json` file in your repository root:
 ```
 
 - `imageName` (required): Docker image name in format `org/name`
-- `dockerfile` (optional): Path to Dockerfile, defaults to `./Dockerfile`
+- `context` (optional): Build context directory, defaults to `.` (the repository root). Set it for an image that builds from a subdirectory, such as a package in a monorepo
+- `dockerfile` (optional): Path to Dockerfile, relative to the repository root. Defaults to `<context>/Dockerfile`
 - `suffix` (optional): Custom suffix for image tags (e.g., `v2`)
 - `target` (optional): Build target stage for multi-stage builds (e.g., `dev`)
 

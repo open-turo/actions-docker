@@ -100,6 +100,7 @@ test_minimal_config() {
 
   gh_output=$(cat "$GITHUB_OUTPUT")
   assert_output_contains "GITHUB_OUTPUT has default dockerfile" "dockerfile=./Dockerfile" "$gh_output"
+  assert_output_contains "GITHUB_OUTPUT has default context" "context=." "$gh_output"
   assert_output_contains "GITHUB_OUTPUT has empty target" "target=" "$gh_output"
   assert_output_contains "GITHUB_OUTPUT has empty tag-suffix" "tag-suffix=" "$gh_output"
 }
@@ -205,6 +206,27 @@ test_config_target_only_still_works() {
   assert_output_contains "GITHUB_OUTPUT has tag-suffix from target" "tag-suffix=-prod" "$gh_output"
 }
 
+test_config_with_context() {
+  echo '{"imageName":"myorg/app","context":"./packages/app"}' > "$TEST_DIR/with-context.json"
+  > "$GITHUB_OUTPUT"
+
+  "$PARSE_SCRIPT" "$TEST_DIR/with-context.json" > /dev/null 2>&1
+
+  gh_output=$(cat "$GITHUB_OUTPUT")
+  assert_output_contains "GITHUB_OUTPUT has context" "context=./packages/app" "$gh_output"
+  assert_output_contains "Dockerfile defaults to the context's" "dockerfile=./packages/app/Dockerfile" "$gh_output"
+}
+
+test_config_with_context_and_dockerfile() {
+  echo '{"imageName":"myorg/app","context":"./packages/app","dockerfile":"./docker/app.Dockerfile"}' > "$TEST_DIR/context-and-dockerfile.json"
+  > "$GITHUB_OUTPUT"
+
+  "$PARSE_SCRIPT" "$TEST_DIR/context-and-dockerfile.json" > /dev/null 2>&1
+
+  gh_output=$(cat "$GITHUB_OUTPUT")
+  assert_output_contains "GITHUB_OUTPUT keeps an explicit dockerfile" "dockerfile=./docker/app.Dockerfile" "$gh_output"
+}
+
 # Run tests
 echo "Running parse-config.sh tests..."
 echo ""
@@ -223,6 +245,8 @@ test_custom_dockerfile
 test_config_with_suffix_only
 test_config_with_suffix_and_target
 test_config_target_only_still_works
+test_config_with_context
+test_config_with_context_and_dockerfile
 
 teardown
 

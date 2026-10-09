@@ -3,7 +3,7 @@ description: Build and push docker images with native or cross-platform support
 inputs:
   docker-config-file:
     required: false
-    description: Path to the docker config file (defaults to .docker-config.json) Must contain imageName, may contain dockerfile.
+    description: Path to the docker config file (defaults to .docker-config.json) Must contain imageName, may contain context and dockerfile.
     default: .docker-config.json
   dockerhub-user:
     required: true
@@ -145,7 +145,7 @@ runs:
       id: build
       uses: docker/build-push-action@v7
       with:
-        context: .
+        context: ${{ steps.config.outputs.context }}
         platforms: ${{ inputs.image-platform }}
         file: ${{ steps.config.outputs.dockerfile }}
         target: ${{ steps.config.outputs.target }}

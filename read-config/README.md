@@ -19,6 +19,7 @@ steps:
   - name: Use parsed values
     run: |
       echo "Image: ${{ steps.config.outputs.image-name }}"
+      echo "Context: ${{ steps.config.outputs.context }}"
       echo "Dockerfile: ${{ steps.config.outputs.dockerfile }}"
       echo "Target: ${{ steps.config.outputs.target }}"
       echo "Tag suffix: ${{ steps.config.outputs.tag-suffix }}"
@@ -46,7 +47,8 @@ steps:
 | Name         | Description                                                                                                               |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------- |
 | `image-name` | Docker image name from config (e.g., `org/image-name`)                                                                    |
-| `dockerfile` | Path to Dockerfile (defaults to `./Dockerfile` if not in config)                                                          |
+| `context`    | Build context directory (defaults to `.` if not in config)                                                                |
+| `dockerfile` | Path to Dockerfile (defaults to `<context>/Dockerfile` if not in config)                                                  |
 | `suffix`     | Custom suffix from config (empty string if not specified)                                                                 |
 | `target`     | Build target stage for multi-stage builds (empty string if not specified)                                                 |
 | `tag-suffix` | Combined tag suffix. If both suffix and target are specified: `-suffix-target`. If only one: `-value`. If neither: empty. |
@@ -66,7 +68,8 @@ The action expects a JSON file with the following structure:
 ### Fields
 
 - **`imageName`** (required): Docker image name in format `org/name`
-- **`dockerfile`** (optional): Path to Dockerfile, defaults to `./Dockerfile`
+- **`context`** (optional): Build context directory, defaults to `.`. Use it for an image that builds from a subdirectory, such as a package in a monorepo.
+- **`dockerfile`** (optional): Path to Dockerfile, relative to the repository root. Defaults to `<context>/Dockerfile`
 - **`suffix`** (optional): Custom suffix for image tags
 - **`target`** (optional): Build target stage for multi-stage builds
 
@@ -88,6 +91,17 @@ The `tag-suffix` output is computed from `suffix` and `target` fields:
   "imageName": "turo/my-service"
 }
 ```
+
+**With a subdirectory as the build context:**
+
+```json
+{
+  "imageName": "turo/my-service",
+  "context": "./packages/my-service"
+}
+```
+
+This builds `./packages/my-service/Dockerfile` with `./packages/my-service` as the context.
 
 **With custom Dockerfile:**
 
